@@ -1,25 +1,36 @@
 Describe
 ========
 
-A go module for describing objects. It provides MUCH more information than the
-`%v` formatter does, allowing you to see more about complex objects at a glance.
+A go module for describing objects as a single line of text. It provides MUCH
+more information than the `%v` formatter does, allowing you to see more about
+complex objects at a glance.
 
-It's designed primarily for debugging and testing.
+It handles recursive data, and can describe structures that would cause `%v`
+to stack overflow.
 
 The description is built as a single line, and is structured as follows:
 
- * Basic types are printed as-is
+ * Basic types are printed as-is (as if printed via `%v`)
  * Strings are enclosed in quotes `""`
+ * Nil pointers are simply printed as `nil`
  * Pointers are preceded by `&`
  * Interfaces are preceded by `@`
  * Slices and arrays are enclosed in `[]`
- * Slices with unsigned int types are printed as hex
- * Maps are enclosed in `{}`
- * Structs are preceded by the struct type name, with fields enclosed in `()`
+ * Slices and arrays of unsigned int types are printed as hex
+ * Maps are enclosed in `{}`, listing keys and values separated by `:`
+ * Structs are preceded by the type name, with fields enclosed in `()`, listing
+   field names and values separated by `:`
+ * Custom describers by convention print a type name, then a description
+   within `<>` (example: `url<http://example.com>`)
+ * Duplicate and cyclic references will be marked as follows:
+   - The first instance will be prepended by an ID and `=`
+   - Further instances will be replaced by a reference: `$` and the ID
 
 
-Example
--------
+Examples
+--------
+
+#### Basic types, pointers, and interfaces
 
 ```golang
 type InnerStruct struct {
@@ -29,6 +40,9 @@ type InnerStruct struct {
 type OuterStruct struct {
 	AnInt          int
 	PInt           *int
+	Bytes          []byte
+	URL            *url.URL
+	Time           time.Time
 	AStruct        InnerStruct
 	PStruct        *InnerStruct
 	AnotherPStruct *InnerStruct
@@ -36,32 +50,90 @@ type OuterStruct struct {
 }
 
 func Demonstration() {
+	urlVal, _ := url.Parse("http://example.com")
 	intVal := 1
 	structVal := InnerStruct{100}
 	v := OuterStruct{
-		4,
-		&intVal,
-		[]byte{0xff, 0x80, 0x44, 0x01},
-		InnerStruct{200},
-		&structVal,
-		nil,
-		map[interface{}]interface{}{
+		AnInt:          4,
+		PInt:           &intVal,
+		Bytes:          []byte{0xff, 0x80, 0x44, 0x01},
+		URL:            urlVal,
+		Time:           time.Date(2020, time.Month(1), 1, 1, 1, 1, 0, time.UTC),
+		AStruct:        InnerStruct{number: 200},
+		PStruct:        &structVal,
+		AnotherPStruct: nil,
+		AMap: map[interface{}]interface{}{
 			"flt":   1.5,
 			"str":   "blah",
-			"inner": InnerStruct{99},
+			"inner": InnerStruct{number: 99},
 		},
 	}
 	fmt.Printf("%v\n", v)
 	fmt.Printf("%v\n", Describe(v))
-
 }
 ```
 
 Outputs:
 
 ```
-{4 0xc0000a0088 [255 128 68 1] {200} 0xc0000a0090 <nil> map[flt:1.5 inner:{99} str:blah]}
-OuterStruct(AnInt:4 PInt:&1 Bytes:[0xff 0x80 0x44 0x01] AStruct:InnerStruct(number:200) PStruct:&InnerStruct(number:100) AnotherPStruct:nil AMap:{@"str":@"blah" @"inner":@InnerStruct(number:99) @"flt":@1.5})
+{4 0xc000018258 [255 128 68 1] http://example.com 2020-01-01 01:01:01 +0000 UTC {200} 0xc000018260 <nil> map[flt:1.5 inner:{99} str:blah]}
+OuterStruct(AnInt:4 PInt:&1 Bytes:[0xff 0x80 0x44 0x01] URL:&url<http://example.com> Time:time<2020-01-01 01:01:01 +0000 UTC> AStruct:InnerStruct(number:200) PStruct:&InnerStruct(number:100) AnotherPStruct:nil AMap:{@"flt":@1.5 @"str":@"blah" @"inner":@InnerStruct(number:99)})
+```
+
+#### Recursive or repetitive data structures
+
+```golang
+type RecursiveStruct struct {
+	IntVal       int
+	RecursivePtr *RecursiveStruct
+	data         interface{}
+}
+
+func DemonstrateRecursive() {
+	someMap := make(map[string]interface{})
+	someMap["mykey"] = someMap
+	v1 := RecursiveStruct{}
+	v1.IntVal = 100
+	v1.RecursivePtr = &v1
+	v1.data = someMap
+	v2 := RecursiveStruct{}
+	v2.IntVal = 5
+	v2.RecursivePtr = &v1
+	v2.data = someMap
+	slice := []interface{}{&v1, &v2, &v1}
+
+	fmt.Printf("%v\n", slice)
+	fmt.Printf("%v\n", Describe(slice))
+}
+```
+
+Outputs:
+
+```
+[0xc00000c340 0xc00000c360 0xc00000c340]
+[@&1=RecursiveStruct(IntVal:100 RecursivePtr:&$1 data:@2={"mykey":@$2}) @&RecursiveStruct(IntVal:5 RecursivePtr:&$1 data:@$2) @&$1]
+```
+
+#### Recursive structure that would cause `%v` to stack overflow
+
+```golang
+func DemonstrateRecursiveMapInStruct() {
+	someMap := make(map[string]interface{})
+	someMap["mykey"] = someMap
+	v := RecursiveStruct{}
+	v.data = someMap
+
+	// Uncommenting this would result in a stack overflow
+	// fmt.Printf("%v\n", v)
+
+	fmt.Printf("%v\n", Describe(v))
+}
+```
+
+Outputs:
+
+```
+RecursiveStruct(IntVal:0 RecursivePtr:nil data:@1={"mykey":@$1})
 ```
 
 
