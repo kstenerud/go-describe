@@ -59,7 +59,8 @@ const (
 	nilPointer         = "nil"
 )
 
-var reflectType = reflect.ValueOf(reflect.ValueOf(true)).Type()
+var reflectValueType = reflect.ValueOf(reflect.ValueOf(true)).Type()
+var reflectTypeType = reflect.TypeOf(reflect.TypeOf(true))
 
 // -----------------
 // Custom describers
@@ -250,17 +251,22 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 	// The actual code logic ends up a little convoluted for performance reasons.
 
 	// Special case: Follow reflect values if we can.
-	if v.Type() == reflectType {
-		this.stringBuilder.WriteString("reflect.Value(")
-		if v.CanInterface() {
-			this.describeReflect(v.Interface().(reflect.Value), asHex)
-		} else if canDereferenceNestedReflectValues() {
-			this.describeReflect(dereferenceNestedReflectValue(v), asHex)
-		} else {
-			this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+	if v.IsValid() && !v.IsZero() {
+		if v.Type() == reflectValueType {
+			this.stringBuilder.WriteString("reflect.Value(")
+			if v.CanInterface() {
+				this.describeReflect(v.Interface().(reflect.Value), asHex)
+			} else if canDereferenceNestedReflectValues() {
+				this.describeReflect(dereferenceNestedReflectValue(v), asHex)
+			} else {
+				this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+			}
+			this.stringBuilder.WriteString(")")
+			return
+		} else if v.Type() == reflectTypeType {
+			this.stringBuilder.WriteString(fmt.Sprintf("reflect.Type(%v)", v))
+			return
 		}
-		this.stringBuilder.WriteString(")")
-		return
 	}
 
 	switch v.Kind() {
@@ -287,9 +293,11 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 		}
 	}
 
-	if customDescriber, ok := customDescribers[v.Type()]; ok && customDescriber != nil {
-		this.stringBuilder.WriteString(customDescriber(v))
-		return
+	if v.IsValid() && !v.IsZero() {
+		if customDescriber, ok := customDescribers[v.Type()]; ok && customDescriber != nil {
+			this.stringBuilder.WriteString(customDescriber(v))
+			return
+		}
 	}
 
 	switch v.Kind() {

@@ -134,6 +134,36 @@ func TestReflectValue(t *testing.T) {
 	}
 }
 
+func TestReflectZeroValue(t *testing.T) {
+	var rv reflect.Value
+
+	expected := `Value(typ:nil ptr:<nil> flag:0)`
+	actual := Describe(rv)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestReflectType(t *testing.T) {
+	rv := reflect.TypeOf(1)
+
+	expected := `reflect.Type(int)`
+	actual := Describe(rv)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestReflectTypeZeroValue(t *testing.T) {
+	var rv reflect.Type
+
+	expected := `<invalid reflect.Value>`
+	actual := Describe(rv)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
 type MyReflect struct {
 	rv reflect.Value
 }
