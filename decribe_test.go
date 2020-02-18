@@ -184,3 +184,42 @@ func TestStructReflectValue(t *testing.T) {
 		}
 	}
 }
+
+type MyType struct {
+	T reflect.Type
+}
+
+func TestStructReflectType(t *testing.T) {
+	rv := MyType{reflect.TypeOf(1)}
+
+	expected := `MyType(T:reflect.Type(int))`
+	actual := Describe(rv)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestStructReflectTypeZeroValue(t *testing.T) {
+	rv := MyType{}
+
+	expected := `MyType(T:nil)`
+	actual := Describe(rv)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+// TODO
+// type MyTypeUnexported struct {
+// 	t reflect.Type
+// }
+
+// func TestStructUnexportedReflectType(t *testing.T) {
+// 	rv := MyTypeUnexported{reflect.TypeOf(1)}
+
+// 	expected := `MyTypeUnexported(t:reflect.Type(int))`
+// 	actual := Describe(rv)
+// 	if actual != expected {
+// 		t.Errorf("Expected %v but got %v", expected, actual)
+// 	}
+// }

@@ -60,7 +60,7 @@ const (
 )
 
 var reflectValueType = reflect.ValueOf(reflect.ValueOf(true)).Type()
-var reflectTypeType = reflect.TypeOf(reflect.TypeOf(true))
+var reflectTypeType = reflect.TypeOf((*reflect.Type)(nil)).Elem()
 
 // -----------------
 // Custom describers
@@ -263,7 +263,7 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 			}
 			this.stringBuilder.WriteString(")")
 			return
-		} else if v.Type() == reflectTypeType {
+		} else if v.Type().Implements(reflectTypeType) {
 			this.stringBuilder.WriteString(fmt.Sprintf("reflect.Type(%v)", v))
 			return
 		}
