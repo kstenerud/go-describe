@@ -3,6 +3,7 @@ package describe
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -117,6 +118,17 @@ func TestRecursiveMapInStruct(t *testing.T) {
 
 	expected := `RecursiveStruct(IntVal:0 RecursivePtr:nil data:@1={"mykey":@$1})`
 	actual := Describe(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestReflectValue(t *testing.T) {
+	v := 1
+	rv := reflect.ValueOf(v)
+
+	expected := `reflect.Value(1)`
+	actual := Describe(rv)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
 	}

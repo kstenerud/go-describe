@@ -26,6 +26,8 @@ const (
 	nilPointer         = "nil"
 )
 
+var reflectType = reflect.ValueOf(reflect.ValueOf(true)).Type()
+
 // -----------------
 // Custom describers
 // -----------------
@@ -213,6 +215,14 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 	// - If there's a custom describer, use that.
 	// - Describe normally.
 	// The actual code logic ends up a little convoluted for performance reasons.
+
+	// Special case: Follow reflect values.
+	if v.Type() == reflectType {
+		this.stringBuilder.WriteString("reflect.Value(")
+		this.describeReflect(v.Interface().(reflect.Value), asHex)
+		this.stringBuilder.WriteString(")")
+		return
+	}
 
 	switch v.Kind() {
 	case reflect.Array, reflect.Slice, reflect.Map, reflect.Struct:
