@@ -1,3 +1,32 @@
+// A go module for describing objects as a single line of text. It provides MUCH
+// more information than the `%v` formatter does, allowing you to see more about
+// complex objects at a glance.
+//
+// It handles recursive data, and can describe structures that would cause `%v`
+// to stack overflow.
+//
+// The description is built as a single line, and is structured as follows:
+//
+//  * Basic types are printed as-is (as if printed via `%v`)
+//  * Strings are enclosed in quotes `""`
+//  * Nil pointers are simply printed as `nil`
+//  * Pointers are preceded by `&`
+//  * Interfaces are preceded by `@`
+//  * Slices and arrays are enclosed in `[]`
+//  * Slices and arrays of unsigned int types are printed as hex
+//  * Maps are enclosed in `{}`, listing keys and values separated by `:`
+//  * Structs are preceded by the type name, with fields enclosed in `()`, listing
+//    field names and values separated by `:`
+//  * Custom describers by convention print a type name, then a description
+//    within `<>` (example: `url<http://example.com>`)
+//  * Duplicate and cyclic references will be marked as follows:
+//    - The first instance will be prepended by an ID and `=`
+//    - Further instances will be replaced by a reference: `$` and the ID
+//
+// Note: describe will use the unsafe package to look inside nested reflect.Value
+//       objects unless compiled with `-tags safe`, or if EnableUnsafeOperations
+//       is set to false. It will also be disabled if compiling for GopherJS or
+//       AppEngine.
 package describe
 
 import (
@@ -7,6 +36,10 @@ import (
 	"strings"
 	"time"
 )
+
+func init() {
+	initNestedReflectValues()
+}
 
 const (
 	openString         = `"`
@@ -216,10 +249,16 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 	// - Describe normally.
 	// The actual code logic ends up a little convoluted for performance reasons.
 
-	// Special case: Follow reflect values.
+	// Special case: Follow reflect values if we can.
 	if v.Type() == reflectType {
 		this.stringBuilder.WriteString("reflect.Value(")
-		this.describeReflect(v.Interface().(reflect.Value), asHex)
+		if v.CanInterface() {
+			this.describeReflect(v.Interface().(reflect.Value), asHex)
+		} else if canDereferenceNestedReflectValues() {
+			this.describeReflect(dereferenceNestedReflectValue(v), asHex)
+		} else {
+			this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		}
 		this.stringBuilder.WriteString(")")
 		return
 	}
@@ -308,6 +347,15 @@ func (this *descriptionContext) describe(v interface{}) string {
 // Public API
 // ----------
 
+// If enabled, panic on errors rather than returning an error string.
+// This is only useful when debugging this library.
+var PanicOnError bool = false
+
+// If disabled, nested reflect.Value structures cannot be examined.
+// This switch does nothing if compiled with `-tags safe`, or compiled for
+// GopherJS or AppEngine, whereby unsafe operations won't even be compiled in.
+var EnableUnsafeOperations = true
+
 // Describes an object in a single line of text.
 //
 // * Basic types are printed as-is (as if printed via %v)
@@ -323,9 +371,18 @@ func (this *descriptionContext) describe(v interface{}) string {
 // * Duplicate and cyclic references will be marked as follows:
 //   - The first instance will be prepended by an ID and =
 //   - Further instances will be replaced by a reference: $ and the ID
-func Describe(v interface{}) string {
+func Describe(v interface{}) (description string) {
+	defer func() {
+		if !PanicOnError {
+			if e := recover(); e != nil {
+				description = fmt.Sprintf("go-describe: Unexpected error: %v", e)
+			}
+		}
+	}()
+
 	context := descriptionContext{}
-	return context.describe(v)
+	description = context.describe(v)
+	return
 }
 
 // User-injectable value describer. Pass a function like this to

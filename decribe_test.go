@@ -133,3 +133,24 @@ func TestReflectValue(t *testing.T) {
 		t.Errorf("Expected %v but got %v", expected, actual)
 	}
 }
+
+type MyReflect struct {
+	rv reflect.Value
+}
+
+func TestStructReflectValue(t *testing.T) {
+	v := MyReflect{rv: reflect.ValueOf(1)}
+
+	actual := Describe(v)
+	if canDereferenceNestedReflectValues() {
+		expected := `MyReflect(rv:reflect.Value(1))`
+		if actual != expected {
+			t.Errorf("Expected %v but got %v", expected, actual)
+		}
+	} else {
+		expectedPrefix := "MyReflect(rv:reflect.Value({0x"
+		if !strings.HasPrefix(actual, expectedPrefix) {
+			t.Errorf("Expected %v to start with %v", actual, expectedPrefix)
+		}
+	}
+}

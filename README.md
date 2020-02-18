@@ -26,6 +26,12 @@ The description is built as a single line, and is structured as follows:
    - The first instance will be prepended by an ID and `=`
    - Further instances will be replaced by a reference: `$` and the ID
 
+#### Note:
+
+Describe will use the unsafe package to look inside nested reflect.Value
+objects unless compiled with `-tags safe`, or if `EnableUnsafeOperations` is set
+to false. It will also be disabled if compiling for GopherJS or AppEngine.
+
 
 Examples
 --------
