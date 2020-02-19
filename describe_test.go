@@ -172,7 +172,7 @@ func TestStructReflectValue(t *testing.T) {
 	v := MyReflect{rv: reflect.ValueOf(1)}
 
 	actual := Describe(v)
-	if canDereferenceNestedReflectValues() {
+	if canInterfaceUnexported() {
 		expected := `MyReflect(rv:reflect.Value(1))`
 		if actual != expected {
 			t.Errorf("Expected %v but got %v", expected, actual)
@@ -209,17 +209,24 @@ func TestStructReflectTypeZeroValue(t *testing.T) {
 	}
 }
 
-// TODO
-// type MyTypeUnexported struct {
-// 	t reflect.Type
-// }
+type MyTypeUnexported struct {
+	T reflect.Type
+	t reflect.Type
+}
 
-// func TestStructUnexportedReflectType(t *testing.T) {
-// 	rv := MyTypeUnexported{reflect.TypeOf(1)}
+func TestStructUnexportedReflectType(t *testing.T) {
+	rv := MyTypeUnexported{reflect.TypeOf(1), reflect.TypeOf(1)}
 
-// 	expected := `MyTypeUnexported(t:reflect.Type(int))`
-// 	actual := Describe(rv)
-// 	if actual != expected {
-// 		t.Errorf("Expected %v but got %v", expected, actual)
-// 	}
-// }
+	actual := Describe(rv)
+	if canInterfaceUnexported() {
+		expected := `MyTypeUnexported(T:reflect.Type(int) t:reflect.Type(int))`
+		if actual != expected {
+			t.Errorf("Expected %v but got %v", expected, actual)
+		}
+	} else {
+		expectedPrefix := "MyTypeUnexported(T:reflect.Type(int) t:reflect.Type(0x"
+		if !strings.HasPrefix(actual, expectedPrefix) {
+			t.Errorf("Expected %v to start with %v", actual, expectedPrefix)
+		}
+	}
+}

@@ -28,9 +28,10 @@ The description is built as a single line, and is structured as follows:
 
 #### Note:
 
-Describe will use the unsafe package to look inside nested reflect.Value
-objects unless compiled with `-tags safe`, or if `EnableUnsafeOperations` is set
-to false. It will also be disabled if compiling for GopherJS or AppEngine.
+Describe will use the unsafe package to expose unexported reflect.Value and
+reflect.Type objects unless compiled with `-tags safe`, or if
+`EnableUnsafeOperations` is set to false. It will also be disabled if compiling
+for GopherJS or AppEngine.
 
 
 Examples

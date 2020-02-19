@@ -21,7 +21,7 @@ var roFlagMask flag
 var flagOffset uintptr
 var hasExpectedReflectStruct bool
 
-func initNestedReflectValues() {
+func initInterfaceUnexported() {
 	if field, ok := reflect.TypeOf(reflect.Value{}).FieldByName("flag"); ok {
 		flagOffset = field.Offset
 		hasExpectedReflectStruct = true
@@ -32,20 +32,20 @@ func initNestedReflectValues() {
 		return
 	}
 
-	getReflectFlag := func(v reflect.Value) flag {
+	getFlag := func(v reflect.Value) flag {
 		return flag(reflect.ValueOf(v).FieldByName("flag").Uint())
 	}
 	rv := reflect.ValueOf(flagChecker{})
-	roFlagMask = ^getReflectFlag(rv.FieldByName("a")) ^ getReflectFlag(rv.FieldByName("A"))
+	roFlagMask = ^getFlag(rv.FieldByName("a")) ^ getFlag(rv.FieldByName("A"))
 }
 
-func canDereferenceNestedReflectValues() bool {
+func canInterfaceUnexported() bool {
 	return hasExpectedReflectStruct && EnableUnsafeOperations
 }
 
-func dereferenceNestedReflectValue(v reflect.Value) reflect.Value {
+func interfaceUnexported(v reflect.Value) interface{} {
 	// Note: This is the only unsafe operation.
 	roFlag := (*flag)(unsafe.Pointer(uintptr(unsafe.Pointer(&v)) + flagOffset))
 	*roFlag &= roFlagMask
-	return v.Interface().(reflect.Value)
+	return v.Interface()
 }

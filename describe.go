@@ -23,10 +23,10 @@
 //    - The first instance will be prepended by an ID and `=`
 //    - Further instances will be replaced by a reference: `$` and the ID
 //
-// Note: describe will use the unsafe package to look inside nested reflect.Value
-//       objects unless compiled with `-tags safe`, or if EnableUnsafeOperations
-//       is set to false. It will also be disabled if compiling for GopherJS or
-//       AppEngine.
+// Note: describe will use the unsafe package to expose unexported
+//       reflect.Value and reflect.Type objects unless compiled with `-tags safe`,
+//       or if EnableUnsafeOperations is set to false. It will also be disabled
+//       if compiling for GopherJS or AppEngine.
 package describe
 
 import (
@@ -38,7 +38,7 @@ import (
 )
 
 func init() {
-	initNestedReflectValues()
+	initInterfaceUnexported()
 }
 
 const (
@@ -250,21 +250,29 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 	// - Describe normally.
 	// The actual code logic ends up a little convoluted for performance reasons.
 
-	// Special case: Follow reflect values if we can.
+	// Special case: Get pretty names for reflect values and types if we can.
 	if v.IsValid() && !v.IsZero() {
 		if v.Type() == reflectValueType {
 			this.stringBuilder.WriteString("reflect.Value(")
 			if v.CanInterface() {
 				this.describeReflect(v.Interface().(reflect.Value), asHex)
-			} else if canDereferenceNestedReflectValues() {
-				this.describeReflect(dereferenceNestedReflectValue(v), asHex)
+			} else if canInterfaceUnexported() {
+				this.describeReflect(interfaceUnexported(v).(reflect.Value), asHex)
 			} else {
 				this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
 			}
 			this.stringBuilder.WriteString(")")
 			return
 		} else if v.Type().Implements(reflectTypeType) {
-			this.stringBuilder.WriteString(fmt.Sprintf("reflect.Type(%v)", v))
+			var asIntf interface{}
+			if v.CanInterface() {
+				asIntf = v.Interface().(reflect.Type)
+			} else if canInterfaceUnexported() {
+				asIntf = interfaceUnexported(v).(reflect.Type)
+			} else {
+				asIntf = v
+			}
+			this.stringBuilder.WriteString(fmt.Sprintf("reflect.Type(%v)", asIntf))
 			return
 		}
 	}
