@@ -48,7 +48,7 @@ func TestDemonstration(t *testing.T) {
 	fmt.Printf("%v\n", Describe(v))
 
 	// Can't compare the entire string because the map entries are in unpredictable order
-	expectedPrefix := `OuterStruct(AnInt:4 PInt:&1 Bytes:[0xff 0x80 0x44 0x01] URL:&url<http://example.com> Time:time<2020-01-01 01:01:01 +0000 UTC> AStruct:InnerStruct(number:200) PStruct:&InnerStruct(number:100) AnotherPStruct:nil AMap:{`
+	expectedPrefix := `describe.OuterStruct(AnInt=4 PInt=*1 Bytes=uint8[0xff 0x80 0x44 0x01] URL=*url.URL(http://example.com) Time=time.Time(2020-01-01 01:01:01 +0000 UTC) AStruct=describe.InnerStruct(number=200) PStruct=*describe.InnerStruct(number=100) AnotherPStruct=nil AMap=interface:interface{`
 	actual := Describe(v)
 	if !strings.HasPrefix(actual, expectedPrefix) {
 		t.Errorf("Expected %v to start with %v", actual, expectedPrefix)
@@ -77,8 +77,8 @@ func TestRecursive(t *testing.T) {
 	fmt.Printf("%v\n", slice)
 	fmt.Printf("%v\n", Describe(slice))
 
-	expected1 := `[@&1=RecursiveStruct(IntVal:100 RecursivePtr:&$1 data:@2={"mykey":@$2}) @&RecursiveStruct(IntVal:5 RecursivePtr:&$1 data:@$2) @&$1]`
-	expected2 := `[@&2=RecursiveStruct(IntVal:100 RecursivePtr:&$2 data:@1={"mykey":@$1}) @&RecursiveStruct(IntVal:5 RecursivePtr:&$2 data:@$1) @&$2]`
+	expected1 := `interface[@*1->describe.RecursiveStruct(IntVal=100 RecursivePtr=*$1 data=@2->string:interface{"mykey"=@$2}) @*describe.RecursiveStruct(IntVal=5 RecursivePtr=*$1 data=@$2) @*$1]`
+	expected2 := `interface[@*2->describe.RecursiveStruct(IntVal=100 RecursivePtr=*$2 data=@1->string:interface{"mykey"=@$1}) @*describe.RecursiveStruct(IntVal=5 RecursivePtr=*$2 data=@$1) @*$2]`
 	actual := Describe(slice)
 	if actual != expected1 && actual != expected2 {
 		t.Errorf("Expected %v but got %v", expected1, actual)
@@ -89,7 +89,7 @@ func TestRecursiveNotAddressable(t *testing.T) {
 	v := RecursiveStruct{}
 	v.RecursivePtr = &v
 
-	expected := `RecursiveStruct(IntVal:0 RecursivePtr:&1=RecursiveStruct(IntVal:0 RecursivePtr:&$1 data:nil) data:nil)`
+	expected := `describe.RecursiveStruct(IntVal=0 RecursivePtr=*1->describe.RecursiveStruct(IntVal=0 RecursivePtr=*$1 data=nil) data=nil)`
 	actual := Describe(v)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -99,7 +99,7 @@ func TestRecursiveNotAddressable(t *testing.T) {
 func TestRecursiveMap(t *testing.T) {
 	v := make(map[string]interface{})
 	v["mykey"] = v
-	expected := `1={"mykey":@$1}`
+	expected := `1->string:interface{"mykey"=@$1}`
 	actual := Describe(v)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -116,7 +116,7 @@ func TestRecursiveMapInStruct(t *testing.T) {
 	// fmt.Printf("%v\n", v)
 	fmt.Printf("%v\n", Describe(v))
 
-	expected := `RecursiveStruct(IntVal:0 RecursivePtr:nil data:@1={"mykey":@$1})`
+	expected := `describe.RecursiveStruct(IntVal=0 RecursivePtr=nil data=@1->string:interface{"mykey"=@$1})`
 	actual := Describe(v)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -137,7 +137,7 @@ func TestReflectValue(t *testing.T) {
 func TestReflectZeroValue(t *testing.T) {
 	var rv reflect.Value
 
-	expected := `Value(typ:nil ptr:<nil> flag:0)`
+	expected := `reflect.Value(typ=nil ptr=nil flag=0)`
 	actual := Describe(rv)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -157,7 +157,7 @@ func TestReflectType(t *testing.T) {
 func TestReflectTypeZeroValue(t *testing.T) {
 	var rv reflect.Type
 
-	expected := `<invalid reflect.Value>`
+	expected := `invalid`
 	actual := Describe(rv)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -173,7 +173,7 @@ func TestStructReflectValue(t *testing.T) {
 
 	actual := Describe(v)
 	if canInterfaceUnexported() {
-		expected := `MyReflect(rv:reflect.Value(1))`
+		expected := `describe.MyReflect(rv=reflect.Value(1))`
 		if actual != expected {
 			t.Errorf("Expected %v but got %v", expected, actual)
 		}
@@ -192,7 +192,7 @@ type MyType struct {
 func TestStructReflectType(t *testing.T) {
 	rv := MyType{reflect.TypeOf(1)}
 
-	expected := `MyType(T:reflect.Type(int))`
+	expected := `describe.MyType(T=reflect.Type(int))`
 	actual := Describe(rv)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -202,7 +202,7 @@ func TestStructReflectType(t *testing.T) {
 func TestStructReflectTypeZeroValue(t *testing.T) {
 	rv := MyType{}
 
-	expected := `MyType(T:nil)`
+	expected := `describe.MyType(T=nil)`
 	actual := Describe(rv)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -219,12 +219,12 @@ func TestStructUnexportedReflectType(t *testing.T) {
 
 	actual := Describe(rv)
 	if canInterfaceUnexported() {
-		expected := `MyTypeUnexported(T:reflect.Type(int) t:reflect.Type(int))`
+		expected := `describe.MyTypeUnexported(T=reflect.Type(int) t=reflect.Type(int))`
 		if actual != expected {
 			t.Errorf("Expected %v but got %v", expected, actual)
 		}
 	} else {
-		expectedPrefix := "MyTypeUnexported(T:reflect.Type(int) t:reflect.Type(0x"
+		expectedPrefix := "describe.MyTypeUnexported(T=reflect.Type(int) t=reflect.Type(0x"
 		if !strings.HasPrefix(actual, expectedPrefix) {
 			t.Errorf("Expected %v to start with %v", actual, expectedPrefix)
 		}

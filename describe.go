@@ -7,21 +7,23 @@
 //
 // The description is built as a single line, and is structured as follows:
 //
-//  * Basic types are printed as-is (as if printed via `%v`)
-//  * Strings are enclosed in quotes `""`
-//  * Nil pointers are simply printed as `nil`
-//  * Pointers are preceded by `&`
-//  * Interfaces are preceded by `@`
-//  * Slices and arrays are enclosed in `[]`
-//  * Slices and arrays of unsigned int types are printed as hex
-//  * Maps are enclosed in `{}`, listing keys and values separated by `:`
-//  * Structs are preceded by the type name, with fields enclosed in `()`, listing
-//    field names and values separated by `:`
-//  * Custom describers by convention print a type name, then a description
-//    within `<>` (example: `url<http://example.com>`)
-//  * Duplicate and cyclic references will be marked as follows:
-//    - The first instance will be prepended by an ID and `=`
-//    - Further instances will be replaced by a reference: `$` and the ID
+// * Basic types are printed as if using `%v`
+// * Strings are enclosed in quotes `""`
+// * Nil pointers are printed as `nil`
+// * The empty interface is printed as `interface` rather than `interface {}`
+// * Non-nil pointers are prefixed with `*`
+// * Interfaces are prefixed with `@`
+// * Slices and arrays are preceded by a type, and enclosed in `[]`
+// * Slices and arrays of unsigned int types are printed as hex
+// * Maps are preceded by key and value types separated by `:`, and enclosed in
+//   `{}`. Keys-value pairs are separated by `=`
+// * Structs are preceded by a type, with fields enclosed in `()`. Name-value
+//   pairs are separated by `=`
+// * Custom describers by convention print a type name, then a description
+//   within `()`. Example: `url.URL(http://example.com)`
+// * Duplicate and cyclic references will be marked as follows:
+//   - The first instance will be prepended by a unique numeric reference ID, then `->`
+//   - Further instances will be replaced by `$` and the referenced ID
 //
 // Note: describe will use the unsafe package to expose unexported
 //       reflect.Value and reflect.Type objects unless compiled with `-tags safe`,
@@ -51,10 +53,11 @@ const (
 	openStruct         = "("
 	closeStruct        = ")"
 	itemSeparator      = " "
-	keyValueSeparator  = ":"
-	pointerPrefix      = "&"
+	mapTypeSeparator   = ":"
+	keyValueSeparator  = "="
+	pointerPrefix      = "*"
 	interfacePrefix    = "@"
-	referenceSeparator = "="
+	referenceSeparator = "->"
 	referencePrefix    = "$"
 	nilPointer         = "nil"
 )
@@ -68,17 +71,18 @@ var reflectTypeType = reflect.TypeOf((*reflect.Type)(nil)).Elem()
 
 var customDescribers = map[reflect.Type]CustomDescriber{
 	reflect.TypeOf(url.URL{}):   describeURL,
-	reflect.TypeOf(time.Time{}): describeTime,
+	reflect.TypeOf(time.Time{}): describeStringer,
 }
 
 func describeURL(v reflect.Value) string {
-	realValue := v.Interface().(url.URL)
-	return fmt.Sprintf(`url<%v>`, realValue.String())
+	// URL doesn't implement stringer for some reason?
+	asString := v.Interface().(url.URL)
+	return fmt.Sprintf(`%v%v%v%v`, v.Type(), openStruct, asString.String(), closeStruct)
 }
 
-func describeTime(v reflect.Value) string {
-	realValue := v.Interface().(time.Time)
-	return fmt.Sprintf(`time<%v>`, realValue.String())
+func describeStringer(v reflect.Value) string {
+	asString := v.Interface().(fmt.Stringer)
+	return fmt.Sprintf(`%v%v%v%v`, v.Type(), openStruct, asString.String(), closeStruct)
 }
 
 // -----------------
@@ -148,12 +152,22 @@ type descriptionContext struct {
 	seenReferences map[uintptr]bool
 }
 
+var interfaceType = reflect.ValueOf([]interface{}{}).Type().Elem()
+
+func getTypeName(t reflect.Type) string {
+	if t == interfaceType {
+		return "interface"
+	}
+	return fmt.Sprintf("%v", t)
+}
+
 func (this *descriptionContext) describeArray(v reflect.Value) {
 	asHex := false
 	switch v.Type().Elem().Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		asHex = true
 	}
+	this.stringBuilder.WriteString(getTypeName(v.Type().Elem()))
 	isFirst := true
 	this.stringBuilder.WriteString(openArray)
 	for i := 0; i < v.Len(); i++ {
@@ -169,6 +183,9 @@ func (this *descriptionContext) describeArray(v reflect.Value) {
 
 func (this *descriptionContext) describeMap(v reflect.Value) {
 	isFirst := true
+	this.stringBuilder.WriteString(getTypeName(v.Type().Key()))
+	this.stringBuilder.WriteString(mapTypeSeparator)
+	this.stringBuilder.WriteString(getTypeName(v.Type().Elem()))
 	this.stringBuilder.WriteString(openMap)
 	iter := v.MapRange()
 	for iter.Next() {
@@ -186,7 +203,7 @@ func (this *descriptionContext) describeMap(v reflect.Value) {
 
 func (this *descriptionContext) describeStruct(v reflect.Value) {
 	isFirst := true
-	this.stringBuilder.WriteString(v.Type().Name())
+	this.stringBuilder.WriteString(getTypeName(v.Type()))
 	this.stringBuilder.WriteString(openStruct)
 	for i := 0; i < v.NumField(); i++ {
 		if isFirst {
@@ -277,6 +294,7 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 		}
 	}
 
+	// Check for references
 	switch v.Kind() {
 	case reflect.Array, reflect.Slice, reflect.Map, reflect.Struct:
 		var ptr uintptr
@@ -345,6 +363,15 @@ func (this *descriptionContext) describeReflect(v reflect.Value, asHex bool) {
 		this.describeUint64(uint64(v.Uint()), asHex)
 	case reflect.Uint:
 		this.describeUint(uint(v.Uint()), asHex)
+	case reflect.UnsafePointer:
+		if v.IsNil() {
+			this.stringBuilder.WriteString(nilPointer)
+		} else {
+			this.stringBuilder.WriteString(pointerPrefix)
+			this.stringBuilder.WriteString(fmt.Sprintf("0x%x", v.UnsafeAddr()))
+		}
+	case reflect.Invalid:
+		this.stringBuilder.WriteString("invalid")
 	default:
 		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
 	}
@@ -372,21 +399,7 @@ var PanicOnError bool = false
 // GopherJS or AppEngine, whereby unsafe operations won't even be compiled in.
 var EnableUnsafeOperations = true
 
-// Describes an object in a single line of text.
-//
-// * Basic types are printed as-is (as if printed via %v)
-// * Strings are enclosed in quotes ""
-// * Nil pointers are simply printed as nil
-// * Pointers are preceded by &
-// * Interfaces are preceded by @
-// * Slices and arrays are enclosed in []
-// * Slices and arrays of unsigned int types are printed as hex
-// * Maps are enclosed in {}, listing keys and values separated by :
-// * Structs are preceded by the struct type name, and fields are enclosed in (),
-//   listing field names and values separated by :
-// * Duplicate and cyclic references will be marked as follows:
-//   - The first instance will be prepended by an ID and =
-//   - Further instances will be replaced by a reference: $ and the ID
+// Describes an object in a single line of text. See package description.
 func Describe(v interface{}) (description string) {
 	defer func() {
 		if !PanicOnError {
@@ -410,8 +423,8 @@ type CustomDescriber func(reflect.Value) string
 // The describer function will be passed an instance of that type as a
 // reflect.Value, and be expected to return a string that describes it.
 //
-// The convention is to print a recognizable type name, followed by the
-// description enclosed in <>. For example: url<http://example.com>
+// The convention is to print a type name, followed by the
+// description enclosed in (). For example: net.URL(http://example.com)
 //
 // Note: Please pass in concrete types rather than pointer or interface types.
 //

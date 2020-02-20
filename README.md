@@ -10,21 +10,20 @@ to stack overflow.
 
 The description is built as a single line, and is structured as follows:
 
- * Basic types are printed as-is (as if printed via `%v`)
+ * Basic types are printed as if using `%v`
  * Strings are enclosed in quotes `""`
- * Nil pointers are simply printed as `nil`
- * Pointers are preceded by `&`
- * Interfaces are preceded by `@`
- * Slices and arrays are enclosed in `[]`
+ * Nil pointers are printed as `nil`
+ * The empty interface is printed as `interface` rather than `interface {}`
+ * Non-nil pointers are prefixed with `*`
+ * Interfaces are prefixed with `@`
+ * Slices and arrays are preceded by a type, and enclosed in `[]`
  * Slices and arrays of unsigned int types are printed as hex
- * Maps are enclosed in `{}`, listing keys and values separated by `:`
- * Structs are preceded by the type name, with fields enclosed in `()`, listing
-   field names and values separated by `:`
- * Custom describers by convention print a type name, then a description
-   within `<>` (example: `url<http://example.com>`)
+ * Maps are preceded by key and value types separated by `:`, and enclosed in `{}`. Keys-value pairs are separated by `=`
+ * Structs are preceded by a type, with fields enclosed in `()`. Name-value pairs are separated by `=`
+ * Custom describers by convention print a type name, then a description within `()`. Example: `url.URL(http://example.com)`
  * Duplicate and cyclic references will be marked as follows:
-   - The first instance will be prepended by an ID and `=`
-   - Further instances will be replaced by a reference: `$` and the ID
+   - The first instance will be prepended by a unique numeric reference ID, then `->`
+   - Further instances will be replaced by `$` and the referenced ID
 
 #### Note:
 
@@ -83,8 +82,8 @@ func Demonstration() {
 Outputs:
 
 ```
-{4 0xc000018258 [255 128 68 1] http://example.com 2020-01-01 01:01:01 +0000 UTC {200} 0xc000018260 <nil> map[flt:1.5 inner:{99} str:blah]}
-OuterStruct(AnInt:4 PInt:&1 Bytes:[0xff 0x80 0x44 0x01] URL:&url<http://example.com> Time:time<2020-01-01 01:01:01 +0000 UTC> AStruct:InnerStruct(number:200) PStruct:&InnerStruct(number:100) AnotherPStruct:nil AMap:{@"flt":@1.5 @"str":@"blah" @"inner":@InnerStruct(number:99)})
+{4 0xc000016288 [255 128 68 1] http://example.com 2020-01-01 01:01:01 +0000 UTC {200} 0xc000016290 <nil> map[flt:1.5 inner:{99} str:blah]}
+describe.OuterStruct(AnInt=4 PInt=*1 Bytes=uint8[0xff 0x80 0x44 0x01] URL=*url.URL(http://example.com) Time=time.Time(2020-01-01 01:01:01 +0000 UTC) AStruct=describe.InnerStruct(number=200) PStruct=*describe.InnerStruct(number=100) AnotherPStruct=nil AMap=interface:interface{@"inner"=@describe.InnerStruct(number=99) @"flt"=@1.5 @"str"=@"blah"})
 ```
 
 #### Recursive or repetitive data structures
@@ -117,8 +116,8 @@ func DemonstrateRecursive() {
 Outputs:
 
 ```
-[0xc00000c340 0xc00000c360 0xc00000c340]
-[@&1=RecursiveStruct(IntVal:100 RecursivePtr:&$1 data:@2={"mykey":@$2}) @&RecursiveStruct(IntVal:5 RecursivePtr:&$1 data:@$2) @&$1]
+[0xc00000c3e0 0xc00000c400 0xc00000c3e0]
+interface[@*1->describe.RecursiveStruct(IntVal=100 RecursivePtr=*$1 data=@2->string:interface{"mykey"=@$2}) @*describe.RecursiveStruct(IntVal=5 RecursivePtr=*$1 data=@$2) @*$1]
 ```
 
 #### Recursive structure that would cause `%v` to stack overflow
@@ -140,7 +139,7 @@ func DemonstrateRecursiveMapInStruct() {
 Outputs:
 
 ```
-RecursiveStruct(IntVal:0 RecursivePtr:nil data:@1={"mykey":@$1})
+describe.RecursiveStruct(IntVal=0 RecursivePtr=nil data=@1->string:interface{"mykey"=@$1})
 ```
 
 
