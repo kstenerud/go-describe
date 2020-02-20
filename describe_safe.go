@@ -6,13 +6,13 @@ import (
 	"reflect"
 )
 
-func initInterfaceUnexported() {
+func initUnsafe() {
 }
 
-func canInterfaceUnexported() bool {
+func canExposeInterface() bool {
 	return false
 }
 
-func interfaceUnexported(v reflect.Value) interface{} {
-	return "go-describe BUG: interfaceUnexported called from safe build"
+func exposeInterface(v reflect.Value) interface{} {
+	return "go-describe.BUG(exposeInterface called from a safe build)"
 }

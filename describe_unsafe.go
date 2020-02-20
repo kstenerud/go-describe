@@ -10,42 +10,60 @@ import (
 	"unsafe"
 )
 
-type flagChecker struct {
-	a int
-	A int
+type flag uintptr // reflect/value.go:flag
+
+type flagROTester struct {
+	A   int
+	a   int // reflect/value.go:flagStickyRO
+	int     // reflect/value.go:flagEmbedRO
+	// Note: flagRO = flagStickyRO | flagEmbedRO
 }
 
-type flag uintptr
-
-var roFlagMask flag
 var flagOffset uintptr
+var maskFlagRO flag
 var hasExpectedReflectStruct bool
 
-func initInterfaceUnexported() {
+func initUnsafe() {
 	if field, ok := reflect.TypeOf(reflect.Value{}).FieldByName("flag"); ok {
 		flagOffset = field.Offset
-		hasExpectedReflectStruct = true
 	} else {
-		log.Printf("go-describe: Unsafe operations disabled because the " +
-			"reflect.Value struct no longer has a flags field. Please open an " +
-			"issue at https://github.com/kstenerud/go-describe\n")
+		log.Println("go-describe: exposeInterface() is disabled because the " +
+			"reflect.Value struct no longer has a flag field. Please open an " +
+			"issue at https://github.com/kstenerud/go-describe/issues")
+		hasExpectedReflectStruct = false
 		return
 	}
 
-	getFlag := func(v reflect.Value) flag {
-		return flag(reflect.ValueOf(v).FieldByName("flag").Uint())
+	rv := reflect.ValueOf(flagROTester{})
+	getFlag := func(v reflect.Value, name string) flag {
+		return flag(reflect.ValueOf(v.FieldByName(name)).FieldByName("flag").Uint())
 	}
-	rv := reflect.ValueOf(flagChecker{})
-	roFlagMask = ^getFlag(rv.FieldByName("a")) ^ getFlag(rv.FieldByName("A"))
+	flagRO := (getFlag(rv, "a") | getFlag(rv, "int")) ^ getFlag(rv, "A")
+	maskFlagRO = ^flagRO
+
+	if flagRO == 0 {
+		log.Println("go-describe: exposeInterface() is disabled because the " +
+			"reflect flag type no longer has a flagEmbedRO or flagStickyRO bit. " +
+			"Please open an issue at https://github.com/kstenerud/go-describe/issues")
+		hasExpectedReflectStruct = false
+		return
+	}
+
+	hasExpectedReflectStruct = true
 }
 
-func canInterfaceUnexported() bool {
+func canExposeInterface() bool {
 	return hasExpectedReflectStruct && EnableUnsafeOperations
 }
 
-func interfaceUnexported(v reflect.Value) interface{} {
-	// Note: This is the only unsafe operation.
-	roFlag := (*flag)(unsafe.Pointer(uintptr(unsafe.Pointer(&v)) + flagOffset))
-	*roFlag &= roFlagMask
+// Expose an interface to an unexported field, subverting the type system.
+//
+// This is ONLY meant for inspecting unexported reflect.Value and reflect.Type
+// fields in order to compensate for an oversight in the reflect API design.
+//
+// Do not use this power for evil; it will consume you and everything you love.
+func exposeInterface(v reflect.Value) interface{} {
+	pFlag := (*flag)(unsafe.Pointer(uintptr(unsafe.Pointer(&v)) + flagOffset))
+	*pFlag &= maskFlagRO
 	return v.Interface()
 }
