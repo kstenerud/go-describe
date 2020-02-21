@@ -251,7 +251,7 @@ func findDuplicatesRecursive(seenPointerCounts map[uintptr]int, v reflect.Value)
 		if checkForDuplicate(seenPointerCounts, v.Pointer()) {
 			return
 		}
-		for iter := v.MapRange(); iter.Next(); {
+		for iter := mapRange(v); iter.Next(); {
 			findDuplicatesRecursive(seenPointerCounts, iter.Value())
 		}
 	case reflect.Struct:
@@ -344,7 +344,7 @@ func (this *describer) describeMap(v reflect.Value) {
 	this.stringBuilder.WriteString(tokOpenMap)
 	this.increaseIndent()
 	isFirst := true
-	for iter := v.MapRange(); iter.Next(); {
+	for iter := mapRange(v); iter.Next(); {
 		this.writeItemSeparator(isFirst)
 		isFirst = false
 		this.describeReflectedValue(iter.Key(), false)
