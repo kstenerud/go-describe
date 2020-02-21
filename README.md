@@ -8,6 +8,8 @@ about complex objects at a glance.
 It handles recursive data, and can describe structures that would cause `%v`
 to stack overflow.
 
+Package describe supports go versions 1.9+
+
 The description is structured as follows:
 
  * Basic types are printed the same as by `%v`

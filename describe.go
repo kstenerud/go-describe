@@ -46,7 +46,6 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 )
@@ -282,14 +281,6 @@ func findDuplicates(v reflect.Value) map[uintptr]int {
 // Describer
 // ---------
 
-type describer struct {
-	indentStep     int
-	currentIndent  int
-	stringBuilder  strings.Builder
-	referenceNames map[uintptr]int
-	seenReferences map[uintptr]bool
-}
-
 func (this *describer) increaseIndent() {
 	this.currentIndent += this.indentStep
 }
@@ -298,22 +289,30 @@ func (this *describer) decreaseIndent() {
 	this.currentIndent -= this.indentStep
 }
 
+func (this *describer) writeString(value string) {
+	this.stringBuilder.WriteString(value)
+}
+
+func (this *describer) writeFmt(format string, args ...interface{}) {
+	this.writeString(fmt.Sprintf(format, args...))
+}
+
 func (this *describer) writeItemSeparator(isFirst bool) {
 	if this.indentStep > 0 {
-		this.stringBuilder.WriteString(tokItemSeparatorMultiline)
+		this.writeString(tokItemSeparatorMultiline)
 		for i := 0; i < this.currentIndent; i++ {
-			this.stringBuilder.WriteString(tokIndent)
+			this.writeString(tokIndent)
 		}
 	} else if !isFirst {
-		this.stringBuilder.WriteString(tokItemSeparator)
+		this.writeString(tokItemSeparator)
 	}
 }
 
 func (this *describer) writeKeyValueSeparator() {
 	if this.indentStep > 0 {
-		this.stringBuilder.WriteString(fmt.Sprintf(" %v ", tokKeyValueSeparator))
+		this.writeFmt(" %v ", tokKeyValueSeparator)
 	} else {
-		this.stringBuilder.WriteString(tokKeyValueSeparator)
+		this.writeString(tokKeyValueSeparator)
 	}
 }
 
@@ -323,8 +322,8 @@ func (this *describer) describeArray(v reflect.Value) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		isInUnsignedArray = true
 	}
-	this.stringBuilder.WriteString(getTypeName(v.Type().Elem()))
-	this.stringBuilder.WriteString(tokOpenArray)
+	this.writeString(getTypeName(v.Type().Elem()))
+	this.writeString(tokOpenArray)
 	this.increaseIndent()
 	isFirst := true
 	for i := 0; i < v.Len(); i++ {
@@ -334,14 +333,14 @@ func (this *describer) describeArray(v reflect.Value) {
 	}
 	this.decreaseIndent()
 	this.writeItemSeparator(true)
-	this.stringBuilder.WriteString(tokCloseArray)
+	this.writeString(tokCloseArray)
 }
 
 func (this *describer) describeMap(v reflect.Value) {
-	this.stringBuilder.WriteString(getTypeName(v.Type().Key()))
-	this.stringBuilder.WriteString(tokMapTypeSeparator)
-	this.stringBuilder.WriteString(getTypeName(v.Type().Elem()))
-	this.stringBuilder.WriteString(tokOpenMap)
+	this.writeString(getTypeName(v.Type().Key()))
+	this.writeString(tokMapTypeSeparator)
+	this.writeString(getTypeName(v.Type().Elem()))
+	this.writeString(tokOpenMap)
 	this.increaseIndent()
 	isFirst := true
 	for iter := mapRange(v); iter.Next(); {
@@ -353,24 +352,24 @@ func (this *describer) describeMap(v reflect.Value) {
 	}
 	this.decreaseIndent()
 	this.writeItemSeparator(true)
-	this.stringBuilder.WriteString(tokCloseMap)
+	this.writeString(tokCloseMap)
 }
 
 func (this *describer) describeStruct(v reflect.Value) {
-	this.stringBuilder.WriteString(getTypeName(v.Type()))
-	this.stringBuilder.WriteString(tokOpenStruct)
+	this.writeString(getTypeName(v.Type()))
+	this.writeString(tokOpenStruct)
 	this.increaseIndent()
 	isFirst := true
 	for i := 0; i < v.NumField(); i++ {
 		this.writeItemSeparator(isFirst)
 		isFirst = false
-		this.stringBuilder.WriteString(v.Type().Field(i).Name)
+		this.writeString(v.Type().Field(i).Name)
 		this.writeKeyValueSeparator()
 		this.describeReflectedValue(v.Field(i), false)
 	}
 	this.decreaseIndent()
 	this.writeItemSeparator(true)
-	this.stringBuilder.WriteString(tokCloseStruct)
+	this.writeString(tokCloseStruct)
 }
 
 func (this *describer) describeFunc(v reflect.Value) {
@@ -380,64 +379,64 @@ func (this *describer) describeFunc(v reflect.Value) {
 	if v.IsNil() {
 		name = "nilfunc"
 	}
-	this.stringBuilder.WriteString(name)
-	this.stringBuilder.WriteString(tokOpenFunc)
+	this.writeString(name)
+	this.writeString(tokOpenFunc)
 	numIn := t.NumIn()
 	for i := 0; i < numIn; i++ {
-		this.stringBuilder.WriteString(getTypeName(t.In(i)))
+		this.writeString(getTypeName(t.In(i)))
 		if i < numIn-1 {
-			this.stringBuilder.WriteString(", ")
+			this.writeString(", ")
 		}
 	}
-	this.stringBuilder.WriteString(tokCloseFunc)
-	this.stringBuilder.WriteString(tokOpenFunc)
+	this.writeString(tokCloseFunc)
+	this.writeString(tokOpenFunc)
 	numOut := t.NumOut()
 	for i := 0; i < numOut; i++ {
-		this.stringBuilder.WriteString(getTypeName(t.Out(i)))
+		this.writeString(getTypeName(t.Out(i)))
 		if i < numOut-1 {
-			this.stringBuilder.WriteString(", ")
+			this.writeString(", ")
 		}
 	}
-	this.stringBuilder.WriteString(tokCloseFunc)
+	this.writeString(tokCloseFunc)
 }
 
 func (this *describer) describeUint8(v uint8, isInUnsignedArray bool) {
 	if isInUnsignedArray {
-		this.stringBuilder.WriteString(fmt.Sprintf("0x%02x", v))
+		this.writeFmt("0x%02x", v)
 	} else {
-		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		this.writeFmt("%v", v)
 	}
 }
 
 func (this *describer) describeUint16(v uint16, isInUnsignedArray bool) {
 	if isInUnsignedArray {
-		this.stringBuilder.WriteString(fmt.Sprintf("0x%04x", v))
+		this.writeFmt("0x%04x", v)
 	} else {
-		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		this.writeFmt("%v", v)
 	}
 }
 
 func (this *describer) describeUint32(v uint32, isInUnsignedArray bool) {
 	if isInUnsignedArray {
-		this.stringBuilder.WriteString(fmt.Sprintf("0x%08x", v))
+		this.writeFmt("0x%08x", v)
 	} else {
-		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		this.writeFmt("%v", v)
 	}
 }
 
 func (this *describer) describeUint64(v uint64, isInUnsignedArray bool) {
 	if isInUnsignedArray {
-		this.stringBuilder.WriteString(fmt.Sprintf("0x%016x", v))
+		this.writeFmt("0x%016x", v)
 	} else {
-		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		this.writeFmt("%v", v)
 	}
 }
 
 func (this *describer) describeUint(v uint, isInUnsignedArray bool) {
 	if isInUnsignedArray {
-		this.stringBuilder.WriteString(stringifyUint(uint64(v)))
+		this.writeString(stringifyUint(uint64(v)))
 	} else {
-		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		this.writeFmt("%v", v)
 	}
 }
 
@@ -446,7 +445,7 @@ func (this *describer) tryDescribeNil(v reflect.Value) (didDescribeNil bool) {
 		if v.Kind() == reflect.Func {
 			this.describeFunc(v)
 		} else {
-			this.stringBuilder.WriteString(tokNilPointer)
+			this.writeString(tokNilPointer)
 		}
 		didDescribeNil = true
 		return
@@ -466,27 +465,27 @@ func (this *describer) tryDescribeReflectValueOrType(v reflect.Value) (didDescri
 	}
 
 	if v.Type() == reflectValueType {
-		this.stringBuilder.WriteString("reflect.Value")
-		this.stringBuilder.WriteString(tokOpenStruct)
+		this.writeString("reflect.Value")
+		this.writeString(tokOpenStruct)
 		if rValue, ok := getInterfaceAsReflectValue(v); ok {
 			this.describeReflectedValue(rValue, false)
 		} else {
-			this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+			this.writeFmt("%v", v)
 		}
-		this.stringBuilder.WriteString(tokCloseStruct)
+		this.writeString(tokCloseStruct)
 		didDescribe = true
 		return
 	}
 
 	if v.Type().Implements(reflectTypeType) {
-		this.stringBuilder.WriteString("reflect.Type")
-		this.stringBuilder.WriteString(tokOpenStruct)
+		this.writeString("reflect.Type")
+		this.writeString(tokOpenStruct)
 		if rValue, ok := getInterfaceAsReflectType(v); ok {
-			this.stringBuilder.WriteString(getTypeName(rValue))
+			this.writeString(getTypeName(rValue))
 		} else {
-			this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+			this.writeFmt("%v", v)
 		}
-		this.stringBuilder.WriteString(tokCloseStruct)
+		this.writeString(tokCloseStruct)
 		didDescribe = true
 		return
 	}
@@ -514,8 +513,8 @@ func (this *describer) tryDescribeReference(v reflect.Value) (didReplaceWithRefe
 			if _, ok := this.seenReferences[ptr]; ok {
 				// The first instance of a repeated structure was described
 				// already, so we replace with a reference.
-				this.stringBuilder.WriteString(tokReferencePrefix)
-				this.stringBuilder.WriteString(fmt.Sprintf("%v", referenceName))
+				this.writeString(tokReferencePrefix)
+				this.writeFmt("%v", referenceName)
 				didReplaceWithReference = true
 				return
 			}
@@ -523,8 +522,8 @@ func (this *describer) tryDescribeReference(v reflect.Value) (didReplaceWithRefe
 			// We're only marking the first instance of a repeated structure
 			// rather than replacing it, so in this case we haven't replaced
 			// with a reference.
-			this.stringBuilder.WriteString(fmt.Sprintf("%v", referenceName))
-			this.stringBuilder.WriteString(tokReferenceSeparator)
+			this.writeFmt("%v", referenceName)
+			this.writeString(tokReferenceSeparator)
 			this.seenReferences[ptr] = true
 			didReplaceWithReference = false
 			return
@@ -542,7 +541,7 @@ func (this *describer) tryUseCustomDescriber(v reflect.Value) (didUseCustomDescr
 	}
 
 	if customDescriber, ok := customDescribers.Load(v.Type()); ok && customDescriber != nil {
-		this.stringBuilder.WriteString(runCustomDescriber(v, customDescriber.(CustomDescriber)))
+		this.writeString(runCustomDescriber(v, customDescriber.(CustomDescriber)))
 		didUseCustomDescriber = true
 		return
 	}
@@ -556,7 +555,7 @@ func (this *describer) describeNormally(v reflect.Value, isInUnsignedArray bool)
 	case reflect.Bool, reflect.Float32, reflect.Float64,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Complex64, reflect.Complex128:
-		this.stringBuilder.WriteString(fmt.Sprintf("%v", v))
+		this.writeFmt("%v", v)
 	case reflect.Uint8:
 		this.describeUint8(uint8(v.Uint()), isInUnsignedArray)
 	case reflect.Uint16:
@@ -568,9 +567,9 @@ func (this *describer) describeNormally(v reflect.Value, isInUnsignedArray bool)
 	case reflect.Uint:
 		this.describeUint(uint(v.Uint()), isInUnsignedArray)
 	case reflect.String:
-		this.stringBuilder.WriteString(tokOpenString)
-		this.stringBuilder.WriteString(v.String())
-		this.stringBuilder.WriteString(tokCloseString)
+		this.writeString(tokOpenString)
+		this.writeString(v.String())
+		this.writeString(tokCloseString)
 	case reflect.Slice, reflect.Array:
 		this.describeArray(v)
 	case reflect.Map:
@@ -578,24 +577,24 @@ func (this *describer) describeNormally(v reflect.Value, isInUnsignedArray bool)
 	case reflect.Struct:
 		this.describeStruct(v)
 	case reflect.Interface:
-		this.stringBuilder.WriteString(tokInterfacePrefix)
+		this.writeString(tokInterfacePrefix)
 		this.describeReflectedValue(v.Elem(), false)
 	case reflect.Ptr:
-		this.stringBuilder.WriteString(tokPointerPrefix)
+		this.writeString(tokPointerPrefix)
 		this.describeReflectedValue(v.Elem(), false)
 	case reflect.Uintptr:
-		this.stringBuilder.WriteString(stringifyAddress(v.Uint()))
+		this.writeString(stringifyAddress(v.Uint()))
 	case reflect.UnsafePointer:
-		this.stringBuilder.WriteString(tokPointerPrefix)
-		this.stringBuilder.WriteString(stringifyAddress(uint64(v.UnsafeAddr())))
+		this.writeString(tokPointerPrefix)
+		this.writeString(stringifyAddress(uint64(v.UnsafeAddr())))
 	case reflect.Invalid:
-		this.stringBuilder.WriteString(tokInvalid)
+		this.writeString(tokInvalid)
 	case reflect.Func:
 		this.describeFunc(v)
 	case reflect.Chan:
-		this.stringBuilder.WriteString(getTypeName(v.Type()))
+		this.writeString(getTypeName(v.Type()))
 	default:
-		this.stringBuilder.WriteString(notifyLibraryBug("unhandled type %v (kind %v): %v", v.Type(), v.Kind(), v))
+		this.writeString(notifyLibraryBug("unhandled type %v (kind %v): %v", v.Type(), v.Kind(), v))
 	}
 }
 

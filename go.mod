@@ -1,3 +1,3 @@
 module github.com/kstenerud/go-describe
 
-go 1.10
+go 1.9
