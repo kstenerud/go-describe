@@ -300,3 +300,12 @@ func TestFuncZeroValue(t *testing.T) {
 		t.Errorf("Expected %v but got %v", expected, actual)
 	}
 }
+
+func TestD(t *testing.T) {
+	v := 1
+	expected := "1"
+	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}

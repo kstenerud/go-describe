@@ -670,6 +670,12 @@ func Describe(v interface{}, indentStep int) (description string) {
 	return
 }
 
+// Alias to `Describe(v, 0)`. Call `describe.D(myobject)` to get a one-line
+// description for logging, debugging, etc.
+func D(v interface{}) (description string) {
+	return Describe(v, 0)
+}
+
 // User-defined value describer. Pass to SetCustomDescriber() when you want
 // different behavior from the default.
 type CustomDescriber func(reflect.Value) string
