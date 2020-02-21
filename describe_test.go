@@ -156,14 +156,10 @@ func TestReflectValue(t *testing.T) {
 func TestReflectZeroValue(t *testing.T) {
 	var rv reflect.Value
 
-	expectedPrefix := `reflect.Value<typ=nil ptr=nil flag=0x00000000`
-	expectedSuffix := `00000000>`
+	expected := `reflect.Value<invalid>`
 	actual := Describe(rv, 0)
-	if !strings.HasPrefix(actual, expectedPrefix) {
-		t.Errorf("Expected %v to start with %v", actual, expectedPrefix)
-	}
-	if !strings.HasSuffix(actual, expectedSuffix) {
-		t.Errorf("Expected %v to end with %v", actual, expectedSuffix)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
 	}
 }
 

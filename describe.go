@@ -7,31 +7,30 @@
 //
 // The description is structured as follows:
 //
-// * Basic types are printed as if using `%v`
+// * Basic types are printed the same as by `%v`
 // * Strings are enclosed in quotes `""`
 // * Non-nil pointers are prefixed with `*`
 // * Nil pointers are printed as `nil`
 // * Interfaces are prefixed with `@`
-// * The empty interface type is printed as `interface`, not `interface{}`
+// * The empty interface type is printed as `interface` (not `interface{}`)
 // * Slices and arrays are preceded by a type, and enclosed in `[]`
 // * Slices and arrays of unsigned int types are printed as hex
-// * Maps are preceded by key and value types separated by `:`, and enclosed in
-//   `{}`. Keys-value pairs are separated by `=`
-// * Structs are preceded by a type, with fields enclosed in `<>`. Name-value
-//   pairs are separated by `=`
-// * Functions are printed in standard style, but with no space between in and
-//   out params. Example: `func(int, bool)(string, bool)`, `func()()`
-// * A function not pointing to an implementation will have the prefix `nilfunc`
-//   instead of `func`. Example: `nilfunc(int, bool)(string, bool)`
-// * Channels are printed the same as in go when they are unidirectional, and
-//   printed as `chan<sometype>` otherwise
+// * Maps begin with `key_type:value_type`, with elements enclosed in `{}`.
+//   Key-value pairs separated by `=`
+// * Structs are preceded by a type, with elements enclosed in `<>`.
+//   Field-value pairs are separated by `=`
+// * Functions begin with `func`, with in and out params enclosed in `()`.
+//   Example: `func(int, bool)(string, bool)`
+// * Nil functions begin with `nilfunc`. Example: `nilfunc(int)(string)`
+// * Unidirectional channels are printed as `<-chan type` and `chan<- type`
+// * Bidirectional channels are printed as `chan<sometype>`
 // * Uintptr and UnsafePointer are printed as hex, in the width of the host system
 // * Invalid values are printed as `invalid`
 // * Custom describers by convention print a type name, then a description within
-//   `<>`. Example: `url.URL<http://example.com>`
+//   `<>`. Example: `url.URL<http://xyz.com>`
 // * Duplicate and cyclic data will be marked as follows:
 //   - The first instance is prefixed by a unique numeric reference ID, then `~`
-//   - Further instances will be replaced by `$` and the referenced ID
+//   - Further instances are replaced by `$`, then the referenced ID
 //
 // Note: Only data is printed; type-specific things such as methods are not.
 //
@@ -91,6 +90,7 @@ const (
 	tokReferencePrefix        = "$"
 	tokNilPointer             = "nil"
 	tokEmptyInterface         = "interface"
+	tokInvalid                = "invalid"
 	tokRecvChannel            = "<-chan"
 	tokSendChannel            = "chan<-"
 )
@@ -119,6 +119,15 @@ var customDescribers sync.Map
 func notifyLibraryBug(format string, params ...interface{}) string {
 	description := fmt.Sprintf(format, params...)
 	return fmt.Sprintf("go-describe.BUG(%v)", description)
+}
+
+func isNil(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map,
+		reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
+		return v.IsNil()
+	}
+	return false
 }
 
 func getTypeName(t reflect.Type) string {
@@ -368,7 +377,7 @@ func (this *describer) describeFunc(v reflect.Value) {
 	var t reflect.Type = v.Type()
 
 	name := "func"
-	if v.IsZero() {
+	if v.IsNil() {
 		name = "nilfunc"
 	}
 	this.stringBuilder.WriteString(name)
@@ -432,11 +441,26 @@ func (this *describer) describeUint(v uint, isInUnsignedArray bool) {
 	}
 }
 
+func (this *describer) tryDescribeNil(v reflect.Value) (didDescribeNil bool) {
+	if isNil(v) {
+		if v.Kind() == reflect.Func {
+			this.describeFunc(v)
+		} else {
+			this.stringBuilder.WriteString(tokNilPointer)
+		}
+		didDescribeNil = true
+		return
+	}
+
+	didDescribeNil = false
+	return
+}
+
 func (this *describer) tryDescribeReflectValueOrType(v reflect.Value) (didDescribe bool) {
 	// reflect.Value and reflect.Type field contents aren't always accessible
 	// depending on their visibility, so we must handle them specially.
 
-	if !v.IsValid() || v.IsZero() {
+	if !v.IsValid() {
 		didDescribe = false
 		return
 	}
@@ -512,7 +536,7 @@ func (this *describer) tryDescribeReference(v reflect.Value) (didReplaceWithRefe
 }
 
 func (this *describer) tryUseCustomDescriber(v reflect.Value) (didUseCustomDescriber bool) {
-	if !v.IsValid() || v.IsZero() {
+	if !v.IsValid() {
 		didUseCustomDescriber = false
 		return
 	}
@@ -554,30 +578,18 @@ func (this *describer) describeNormally(v reflect.Value, isInUnsignedArray bool)
 	case reflect.Struct:
 		this.describeStruct(v)
 	case reflect.Interface:
-		if v.IsNil() {
-			this.stringBuilder.WriteString(tokNilPointer)
-		} else {
-			this.stringBuilder.WriteString(tokInterfacePrefix)
-			this.describeReflectedValue(v.Elem(), false)
-		}
+		this.stringBuilder.WriteString(tokInterfacePrefix)
+		this.describeReflectedValue(v.Elem(), false)
 	case reflect.Ptr:
-		if v.IsNil() {
-			this.stringBuilder.WriteString(tokNilPointer)
-		} else {
-			this.stringBuilder.WriteString(tokPointerPrefix)
-			this.describeReflectedValue(v.Elem(), false)
-		}
+		this.stringBuilder.WriteString(tokPointerPrefix)
+		this.describeReflectedValue(v.Elem(), false)
 	case reflect.Uintptr:
 		this.stringBuilder.WriteString(stringifyAddress(v.Uint()))
 	case reflect.UnsafePointer:
-		if v.IsNil() {
-			this.stringBuilder.WriteString(tokNilPointer)
-		} else {
-			this.stringBuilder.WriteString(tokPointerPrefix)
-			this.stringBuilder.WriteString(stringifyAddress(uint64(v.UnsafeAddr())))
-		}
+		this.stringBuilder.WriteString(tokPointerPrefix)
+		this.stringBuilder.WriteString(stringifyAddress(uint64(v.UnsafeAddr())))
 	case reflect.Invalid:
-		this.stringBuilder.WriteString("invalid")
+		this.stringBuilder.WriteString(tokInvalid)
 	case reflect.Func:
 		this.describeFunc(v)
 	case reflect.Chan:
@@ -588,6 +600,10 @@ func (this *describer) describeNormally(v reflect.Value, isInUnsignedArray bool)
 }
 
 func (this *describer) describeReflectedValue(v reflect.Value, isInsideUnsignedArray bool) {
+	if this.tryDescribeNil(v) {
+		return
+	}
+
 	if this.tryDescribeReflectValueOrType(v) {
 		return
 	}

@@ -10,31 +10,30 @@ to stack overflow.
 
 The description is structured as follows:
 
- * Basic types are printed as if using `%v`
+ * Basic types are printed the same as by `%v`
  * Strings are enclosed in quotes `""`
  * Non-nil pointers are prefixed with `*`
  * Nil pointers are printed as `nil`
  * Interfaces are prefixed with `@`
- * The empty interface type is printed as `interface`, not `interface{}`
+ * The empty interface type is printed as `interface` (not `interface{}`)
  * Slices and arrays are preceded by a type, and enclosed in `[]`
  * Slices and arrays of unsigned int types are printed as hex
- * Maps are preceded by key and value types separated by `:`, and enclosed in
-   `{}`. Keys-value pairs are separated by `=`
- * Structs are preceded by a type, with fields enclosed in `<>`. Name-value
-   pairs are separated by `=`
- * Functions are printed in standard style, but with no space between in and
-   out params. Example: `func(int, bool)(string, bool)`, `func()()`
- * A function not pointing to an implementation will have the prefix `nilfunc`
-   instead of `func`. Example: `nilfunc(int, bool)(string, bool)`
- * Channels are printed the same as in go when they are unidirectional, and
-   printed as `chan<sometype>` otherwise
+ * Maps begin with `key_type:value_type`, with elements enclosed in `{}`.
+   Key-value pairs separated by `=`
+ * Structs are preceded by a type, with elements enclosed in `<>`.
+   Field-value pairs are separated by `=`
+ * Functions begin with `func`, with in and out params enclosed in `()`.
+   Example: `func(int, bool)(string, bool)`
+ * Nil functions begin with `nilfunc`. Example: `nilfunc(int)(string)`
+ * Unidirectional channels are printed as `<-chan type` and `chan<- type`
+ * Bidirectional channels are printed as `chan<sometype>`
  * Uintptr and UnsafePointer are printed as hex, in the width of the host system
  * Invalid values are printed as `invalid`
  * Custom describers by convention print a type name, then a description within
-   `<>`. Example: `url.URL<http://example.com>`
+   `<>`. Example: `url.URL<http://xyz.com>`
  * Duplicate and cyclic data will be marked as follows:
    - The first instance is prefixed by a unique numeric reference ID, then `~`
-   - Further instances will be replaced by `$` and the referenced ID
+   - Further instances are replaced by `$`, then the referenced ID
 
 **Note:** Only data is printed; type-specific things such as methods are not.
 
