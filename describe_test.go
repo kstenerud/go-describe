@@ -309,3 +309,30 @@ func TestD(t *testing.T) {
 		t.Errorf("Expected %v but got %v", expected, actual)
 	}
 }
+
+type StructWithArray struct {
+	Arr [4]byte
+}
+
+func TestStructWithArray(t *testing.T) {
+	v := StructWithArray{}
+	expected := "describe.StructWithArray<Arr=uint8[0x00 0x00 0x00 0x00]>"
+	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+type StructWithArrayRecursive struct {
+	Arr [4]*StructWithArrayRecursive
+}
+
+func TestStructWithArrayRecursive(t *testing.T) {
+	v := StructWithArrayRecursive{}
+	v.Arr[0] = &v
+	expected := "describe.StructWithArrayRecursive<Arr=*describe.StructWithArrayRecursive[*1~describe.StructWithArrayRecursive<Arr=$1> nil nil nil]>"
+	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}

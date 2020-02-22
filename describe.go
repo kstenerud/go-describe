@@ -239,7 +239,16 @@ func findDuplicatesRecursive(seenPointerCounts map[uintptr]int, v reflect.Value)
 	switch v.Kind() {
 	case reflect.Ptr, reflect.Interface:
 		findDuplicatesRecursive(seenPointerCounts, v.Elem())
-	case reflect.Array, reflect.Slice:
+	case reflect.Array:
+		if v.CanAddr() {
+			if checkForDuplicate(seenPointerCounts, v.Addr().Pointer()) {
+				return
+			}
+		}
+		for i := 0; i < v.Len(); i++ {
+			findDuplicatesRecursive(seenPointerCounts, v.Index(i))
+		}
+	case reflect.Slice:
 		if checkForDuplicate(seenPointerCounts, v.Pointer()) {
 			return
 		}
@@ -500,7 +509,7 @@ func (this *describer) tryDescribeReference(v reflect.Value) (didReplaceWithRefe
 	switch v.Kind() {
 	case reflect.Array, reflect.Slice, reflect.Map, reflect.Struct:
 		var ptr uintptr
-		if v.Kind() == reflect.Struct {
+		if v.Kind() == reflect.Struct || v.Kind() == reflect.Array {
 			if !v.CanAddr() {
 				didReplaceWithReference = false
 				return
