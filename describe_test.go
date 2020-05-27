@@ -2,6 +2,7 @@ package describe
 
 import (
 	"fmt"
+	"math/big"
 	"net/url"
 	"reflect"
 	"strings"
@@ -331,6 +332,28 @@ func TestStructWithArrayRecursive(t *testing.T) {
 	v := StructWithArrayRecursive{}
 	v.Arr[0] = &v
 	expected := "describe.StructWithArrayRecursive<Arr=*describe.StructWithArrayRecursive[*1~describe.StructWithArrayRecursive<Arr=$1> nil nil nil]>"
+	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestBigInt(t *testing.T) {
+	v := big.NewInt(100)
+	v = v.Exp(v, v, nil)
+	expected := "*big.Int<100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000>"
+	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestBigFloat(t *testing.T) {
+	v := big.NewFloat(123456789012345)
+	for i := 0; i < 10; i++ {
+		v = v.Mul(v, v)
+	}
+	expected := "*big.Float<5.144422936e+14429>"
 	actual := D(v)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)

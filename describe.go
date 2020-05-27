@@ -44,6 +44,7 @@ package describe
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"net/url"
 	"reflect"
 	"sync"
@@ -59,6 +60,8 @@ func init() {
 
 	SetCustomDescriber(reflect.TypeOf(url.URL{}), describeURL)
 	SetCustomDescriber(reflect.TypeOf(time.Time{}), describeStringer)
+	SetCustomDescriber(reflect.TypeOf(&big.Int{}), describeStringer)
+	SetCustomDescriber(reflect.TypeOf(&big.Float{}), describeStringer)
 }
 
 // ----------------
