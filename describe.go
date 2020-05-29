@@ -44,6 +44,7 @@ package describe
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sync"
 )
@@ -54,6 +55,8 @@ import (
 
 func init() {
 	initUnsafe()
+	SetCustomDescriber(reflect.TypeOf(big.Float{}), describeBigFloat)
+	SetCustomDescriber(reflect.TypeOf((*big.Float)(nil)), describePBigFloat)
 }
 
 // ----------------
@@ -208,6 +211,24 @@ func runCustomDescriber(v reflect.Value, describer CustomDescriber) (description
 func describeStringer(v reflect.Value) string {
 	asString := v.Interface().(fmt.Stringer)
 	return fmt.Sprintf(`%v%v%v%v`, v.Type(), tokOpenStruct, asString.String(), tokCloseStruct)
+}
+
+var bitsToDigits = []int{0, 1, 1, 1, 1, 2, 2, 2, 3, 3}
+
+func describeBigFloat(v reflect.Value) string {
+	f := v.Interface().(big.Float)
+	precisionBits := int(f.Prec())
+	digits := (precisionBits/10)*3 + bitsToDigits[precisionBits%10]
+	str := f.Text('g', digits)
+	return fmt.Sprintf(`%v%v%v%v`, v.Type(), tokOpenStruct, str, tokCloseStruct)
+}
+
+func describePBigFloat(v reflect.Value) string {
+	f := v.Interface().(*big.Float)
+	if f == nil {
+		return "nil"
+	}
+	return "*" + describeBigFloat(v.Elem())
 }
 
 // -----------------

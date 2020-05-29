@@ -350,10 +350,12 @@ func TestBigInt(t *testing.T) {
 
 func TestBigFloat(t *testing.T) {
 	v := big.NewFloat(123456789012345)
+	v.SetPrec(100)
+	v = v.Add(v, big.NewFloat(0.123456789012345))
 	for i := 0; i < 10; i++ {
-		v = v.Mul(v, v)
+		v = v.Mul(v, big.NewFloat(100000000))
 	}
-	expected := "*big.Float<5.144422936e+14429>"
+	expected := "*big.Float<1.23456789012345123456789012345e+94>"
 	actual := D(v)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
