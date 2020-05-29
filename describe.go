@@ -44,11 +44,8 @@ package describe
 import (
 	"bytes"
 	"fmt"
-	"math/big"
-	"net/url"
 	"reflect"
 	"sync"
-	"time"
 )
 
 // ------------
@@ -57,11 +54,6 @@ import (
 
 func init() {
 	initUnsafe()
-
-	SetCustomDescriber(reflect.TypeOf(url.URL{}), describeURL)
-	SetCustomDescriber(reflect.TypeOf(time.Time{}), describeStringer)
-	SetCustomDescriber(reflect.TypeOf(&big.Int{}), describeStringer)
-	SetCustomDescriber(reflect.TypeOf(&big.Float{}), describeStringer)
 }
 
 // ----------------
@@ -211,11 +203,6 @@ func runCustomDescriber(v reflect.Value, describer CustomDescriber) (description
 
 	description = describer(v)
 	return
-}
-
-func describeURL(v reflect.Value) string {
-	asString := v.Interface().(url.URL)
-	return fmt.Sprintf(`%v%v%v%v`, v.Type(), tokOpenStruct, asString.String(), tokCloseStruct)
 }
 
 func describeStringer(v reflect.Value) string {
@@ -562,6 +549,19 @@ func (this *describer) tryUseCustomDescriber(v reflect.Value) (didUseCustomDescr
 	return
 }
 
+func (this *describer) tryUseStringerDescriber(v reflect.Value) (didUseStringerDescriber bool) {
+	if !v.IsValid() || v.IsZero() {
+		return
+	}
+	method := v.MethodByName("String")
+	if !method.IsValid() {
+		return
+	}
+	this.writeString(describeStringer(v))
+	didUseStringerDescriber = true
+	return
+}
+
 func (this *describer) describeNormally(v reflect.Value, isInUnsignedArray bool) {
 	switch v.Kind() {
 	case reflect.Bool, reflect.Float32, reflect.Float64,
@@ -624,6 +624,10 @@ func (this *describer) describeReflectedValue(v reflect.Value, isInsideUnsignedA
 	}
 
 	if this.tryUseCustomDescriber(v) {
+		return
+	}
+
+	if this.tryUseStringerDescriber(v) {
 		return
 	}
 
