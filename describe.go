@@ -47,6 +47,8 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
+
+	"github.com/kstenerud/go-duplicates"
 )
 
 // ------------
@@ -235,61 +237,15 @@ func describePBigFloat(v reflect.Value) string {
 // Duplicates Finder
 // -----------------
 
-func checkForDuplicate(seenPointerCounts map[uintptr]int, ptr uintptr) (duplicateFound bool) {
-	if count, ok := seenPointerCounts[ptr]; ok {
-		seenPointerCounts[ptr] = count + 1
-		duplicateFound = true
-		return
+func findDuplicates(v reflect.Value) map[duplicates.TypedPointer]int {
+	referenceNames := map[duplicates.TypedPointer]int{}
+	if !v.IsValid() {
+		return referenceNames
 	}
-
-	seenPointerCounts[ptr] = 1
-	return
-}
-
-func findDuplicatesRecursive(seenPointerCounts map[uintptr]int, v reflect.Value) {
-	switch v.Kind() {
-	case reflect.Ptr, reflect.Interface:
-		findDuplicatesRecursive(seenPointerCounts, v.Elem())
-	case reflect.Array:
-		if v.CanAddr() {
-			if checkForDuplicate(seenPointerCounts, v.Addr().Pointer()) {
-				return
-			}
-		}
-		for i := 0; i < v.Len(); i++ {
-			findDuplicatesRecursive(seenPointerCounts, v.Index(i))
-		}
-	case reflect.Slice:
-		if checkForDuplicate(seenPointerCounts, v.Pointer()) {
-			return
-		}
-		for i := 0; i < v.Len(); i++ {
-			findDuplicatesRecursive(seenPointerCounts, v.Index(i))
-		}
-	case reflect.Map:
-		if checkForDuplicate(seenPointerCounts, v.Pointer()) {
-			return
-		}
-		for iter := mapRange(v); iter.Next(); {
-			findDuplicatesRecursive(seenPointerCounts, iter.Value())
-		}
-	case reflect.Struct:
-		if v.CanAddr() && checkForDuplicate(seenPointerCounts, v.Addr().Pointer()) {
-			return
-		}
-		for i := 0; i < v.NumField(); i++ {
-			findDuplicatesRecursive(seenPointerCounts, v.Field(i))
-		}
-	}
-}
-
-func findDuplicates(v reflect.Value) map[uintptr]int {
-	seenPointerCounts := map[uintptr]int{}
-	findDuplicatesRecursive(seenPointerCounts, v)
+	duplicatePtrs := duplicates.FindDuplicatePointers(v.Interface())
 	referenceName := 1
-	referenceNames := map[uintptr]int{}
-	for pointer, count := range seenPointerCounts {
-		if count > 1 {
+	for pointer, isDuplicate := range duplicatePtrs {
+		if isDuplicate {
 			referenceNames[pointer] = referenceName
 			referenceName++
 		}
@@ -519,15 +475,15 @@ func (this *describer) tryDescribeReference(v reflect.Value) (didReplaceWithRefe
 
 	switch v.Kind() {
 	case reflect.Array, reflect.Slice, reflect.Map, reflect.Struct:
-		var ptr uintptr
+		var ptr duplicates.TypedPointer
 		if v.Kind() == reflect.Struct || v.Kind() == reflect.Array {
 			if !v.CanAddr() {
 				didReplaceWithReference = false
 				return
 			}
-			ptr = v.Addr().Pointer()
+			ptr = duplicates.TypedPointerOfRV(v.Addr())
 		} else {
-			ptr = v.Pointer()
+			ptr = duplicates.TypedPointerOfRV(v)
 		}
 		if referenceName, ok := this.referenceNames[ptr]; ok {
 			if _, ok := this.seenReferences[ptr]; ok {
@@ -676,7 +632,7 @@ func (this *describer) describe(v interface{}) (description string) {
 	rv := reflect.ValueOf(v)
 	this.referenceNames = findDuplicates(rv)
 	this.stringBuilder.Reset()
-	this.seenReferences = make(map[uintptr]bool)
+	this.seenReferences = make(map[duplicates.TypedPointer]bool)
 	this.describeReflectedValue(rv, false)
 	description = this.stringBuilder.String()
 	return

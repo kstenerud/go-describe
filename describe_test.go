@@ -135,6 +135,18 @@ func TestRecursiveMap(t *testing.T) {
 	}
 }
 
+type BigFloatStruct struct {
+	BigFloat big.Float
+}
+
+func TestBigFloatStruct(t *testing.T) {
+	expected := `*describe.BigFloatStruct<BigFloat=big.Float<0>>`
+	actual := Describe(new(BigFloatStruct), 0)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
 func TestNil(t *testing.T) {
 	expected := `invalid`
 	actual := Describe(nil, 0)
@@ -331,7 +343,21 @@ type StructWithArrayRecursive struct {
 func TestStructWithArrayRecursive(t *testing.T) {
 	v := StructWithArrayRecursive{}
 	v.Arr[0] = &v
-	expected := "describe.StructWithArrayRecursive<Arr=*describe.StructWithArrayRecursive[*1~describe.StructWithArrayRecursive<Arr=$1> nil nil nil]>"
+	expected := "describe.StructWithArrayRecursive<Arr=*describe.StructWithArrayRecursive[*1~describe.StructWithArrayRecursive<Arr=*describe.StructWithArrayRecursive[*$1 nil nil nil]> nil nil nil]>"
+	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+type StructWithSliceRecursive struct {
+	Slice []*StructWithSliceRecursive
+}
+
+func TestStructWithSliceRecursive(t *testing.T) {
+	v := StructWithSliceRecursive{}
+	v.Slice = append(v.Slice, &v)
+	expected := "describe.StructWithSliceRecursive<Slice=1~*describe.StructWithSliceRecursive[*describe.StructWithSliceRecursive<Slice=$1>]>"
 	actual := D(v)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
