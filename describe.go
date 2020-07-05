@@ -629,7 +629,11 @@ func (this *describer) describe(v interface{}) (description string) {
 
 	this.sanityCheck()
 
-	rv := reflect.ValueOf(v)
+	rv, ok := v.(reflect.Value)
+	if !ok {
+		rv = reflect.ValueOf(v)
+	}
+
 	this.referenceNames = findDuplicates(rv)
 	this.stringBuilder.Reset()
 	this.seenReferences = make(map[duplicates.TypedPointer]bool)

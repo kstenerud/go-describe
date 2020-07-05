@@ -159,7 +159,7 @@ func TestReflectValue(t *testing.T) {
 	v := 1
 	rv := reflect.ValueOf(v)
 
-	expected := `reflect.Value<1>`
+	expected := `1`
 	actual := Describe(rv, 0)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -169,7 +169,7 @@ func TestReflectValue(t *testing.T) {
 func TestReflectZeroValue(t *testing.T) {
 	var rv reflect.Value
 
-	expected := `reflect.Value<invalid>`
+	expected := `invalid`
 	actual := Describe(rv, 0)
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
@@ -383,6 +383,16 @@ func TestBigFloat(t *testing.T) {
 	}
 	expected := "*big.Float<1.23456789012345123456789012345e+94>"
 	actual := D(v)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}
+
+func TestRecursiveSliceRV(t *testing.T) {
+	rintf := make([]interface{}, 1)
+	rintf[0] = rintf
+	expected := "1~interface[@$1]"
+	actual := D(reflect.ValueOf(rintf))
 	if actual != expected {
 		t.Errorf("Expected %v but got %v", expected, actual)
 	}
