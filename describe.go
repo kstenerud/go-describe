@@ -534,6 +534,10 @@ func (this *describer) tryUseStringerDescriber(v reflect.Value) (didUseStringerD
 	if !method.IsValid() {
 		return
 	}
+	defer func() {
+		// If a stringer panics somewhere, just abort.
+		recover()
+	}()
 	this.writeString(describeStringer(v))
 	didUseStringerDescriber = true
 	return
