@@ -397,3 +397,25 @@ func TestRecursiveSliceRV(t *testing.T) {
 		t.Errorf("Expected %v but got %v", expected, actual)
 	}
 }
+
+type UnexportedStringer struct{}
+
+func (_this *UnexportedStringer) String() string {
+	return "xyz"
+}
+
+type UnexportedStringerTest struct {
+	unexported *UnexportedStringer
+}
+
+func TestUnexportedStringer(t *testing.T) {
+	DebugPanics = true
+	x := &UnexportedStringerTest{
+		unexported: &UnexportedStringer{},
+	}
+	expected := "*describe.UnexportedStringerTest<unexported=*describe.UnexportedStringer<xyz>>"
+	actual := D(x)
+	if actual != expected {
+		t.Errorf("Expected %v but got %v", expected, actual)
+	}
+}

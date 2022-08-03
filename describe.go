@@ -211,8 +211,18 @@ func runCustomDescriber(v reflect.Value, describer CustomDescriber) (description
 }
 
 func describeStringer(v reflect.Value) string {
-	asString := v.Interface().(fmt.Stringer)
-	return fmt.Sprintf(`%v%v%v%v`, v.Type(), tokOpenStruct, asString.String(), tokCloseStruct)
+	var asString fmt.Stringer
+
+	if v.CanInterface() {
+		asString = v.Interface().(fmt.Stringer)
+	} else if canExposeInterface() {
+		asString = exposeInterface(v).(fmt.Stringer)
+	}
+
+	if asString != nil {
+		return fmt.Sprintf(`%v%v%v%v`, v.Type(), tokOpenStruct, asString.String(), tokCloseStruct)
+	}
+	return fmt.Sprintf(`%v%vunexported%v`, v.Type(), tokOpenStruct, tokCloseStruct)
 }
 
 var bitsToDigits = []int{0, 1, 1, 1, 1, 2, 2, 2, 3, 3}
